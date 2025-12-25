@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>משחק התאמה - חלבונים</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ffd900 0%, #ffed4e 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .game-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            max-width: 1200px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        
+        .column {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .card {
+            background: #4ade80;
+            border: 3px solid #22c55e;
+            border-radius: 15px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            font-size: 1.1em;
+            color: #1e3a1e;
+            font-weight: 500;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        .card.selected {
+            background: #a855f7;
+            border-color: #9333ea;
+            transform: scale(1.05);
+        }
+        
+        .card.matched {
+            background: #a855f7;
+            border-color: #9333ea;
+            pointer-events: none;
+            position: relative;
+        }
+        
+        .card.matched::after {
+            content: '🏆';
+            font-size: 2em;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: trophy 0.5s ease;
+        }
+        
+        @keyframes trophy {
+            0% { transform: translate(-50%, -50%) scale(0); }
+            50% { transform: translate(-50%, -50%) scale(1.3); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+        
+        .score {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.5em;
+            color: #2c3e50;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .success-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: none;
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        .success-message.show {
+            display: block;
+            animation: popup 0.5s ease;
+        }
+        
+        @keyframes popup {
+            0% { transform: translate(-50%, -50%) scale(0); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); }
+        }
+        
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            z-index: 999;
+        }
+        
+        .overlay.show {
+            display: block;
+        }
+        
+        button {
+            background: #4ade80;
+            color: #1e3a1e;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 1.2em;
+            cursor: pointer;
+            margin-top: 20px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #22c55e;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <h1>🧬 משחק התאמה - חלבונים: מבנה ותפקיד 🧬</h1>
+    
+    <div class="score">
+        <span>התאמות נכונות: <strong id="scoreCount">0</strong> / 20</span>
+    </div>
+    
+    <div class="game-container">
+        <div class="column" id="termsColumn"></div>
+        <div class="column" id="definitionsColumn"></div>
+    </div>
+    
+    <div class="overlay" id="overlay"></div>
+    <div class="success-message" id="successMessage">
+        <h2>🎉 כל הכבוד! 🎉</h2>
+        <p style="font-size: 1.5em; margin: 20px 0;">סיימת את המשחק בהצלחה!</p>
+        <button onclick="resetGame()">שחק שוב</button>
+    </div>
+
+    <script>
+        const pairs = [
+            { term: 'דנטורציה (Denaturation)', definition: 'שינוי המבנה המרחבי של החלבון' },
+            { term: 'חומצות אמינו (Amino Acids)', definition: 'יחידות הבניין הבסיסיות של חלבונים' },
+            { term: 'קשר פפטידי (Peptide Bond)', definition: 'קשר כימי המחבר בין שתי חומצות אמינו' },
+            { term: 'מבנה ראשוני (Primary Structure)', definition: 'רצף חומצות האמינו בשרשרת החלבון' },
+            { term: 'מבנה שניוני (Secondary Structure)', definition: 'סליל אלפא או יריעת בטא בחלבון' },
+            { term: 'מבנה שלישוני (Tertiary Structure)', definition: 'המבנה התלת-מימדי הכולל של שרשרת החלבון' },
+            { term: 'מבנה רבעוני (Quaternary Structure)', definition: 'התארגנות של מספר שרשרות חלבון ביחד' },
+            { term: 'אנזימים (Enzymes)', definition: 'חלבונים המזרזים תגובות כימיות בגוף' },
+            { term: 'נוגדנים (Antibodies)', definition: 'חלבונים המגנים על הגוף מפני פתוגנים' },
+            { term: 'המוגלובין (Hemoglobin)', definition: 'חלבון המעביר חמצן בדם' },
+            { term: 'אקטין ומיוזין (Actin & Myosin)', definition: 'חלבונים המאפשרים תנועת שרירים' },
+            { term: 'קולגן (Collagen)', definition: 'חלבון מבני העיקרי ברקמות חיבור' },
+            { term: 'אתר פעיל (Active Site)', definition: 'האזור באנזים שבו מתרחשת התגובה הכימית' },
+            { term: 'סובסטרט (Substrate)', definition: 'החומר שעליו פועל האנזים' },
+            { term: 'קו-פקטור (Cofactor)', definition: 'מולקולה לא חלבונית הנדרשת לפעילות אנזים' },
+            { term: 'חלבון גלובולרי (Globular Protein)', definition: 'חלבון כדורי ומסיס במים' },
+            { term: 'חלבון פיברילרי (Fibrous Protein)', definition: 'חלבון ארוך ובלתי מסיס למבנה ותמיכה' },
+            { term: 'הורמונים (Hormones)', definition: 'חלבונים המשמשים כשליחים כימיים בגוף' },
+            { term: 'שרשרת פוליפפטיד (Polypeptide)', definition: 'שרשרת ארוכה של חומצות אמינו מקושרות' },
+            { term: 'גשרי דיסולפיד (Disulfide Bridges)', definition: 'קשרים כימיים בין מולקולות גופרית המייצבים מבנה' }
+        ];
+
+        let selectedTerm = null;
+        let selectedDef = null;
+        let matchedPairs = 0;
+        const successSound = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OKiUhELTKXh8bllHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3YoBTB7zPLajTkIG2m98OKiUhELTKXh8bllHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3YoBTB7zPLajTkIG2m98OKiUhELTKXh8bllHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3YoBTB7zPLajTkIG2m98OKiUhELTKXh8bllHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3YoBTB7zPLajTkIG2m98OKiUhELTKXh8bllHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3YoBTB7zPLajTkIG2m98OKiUhELTKXh8bllHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3YoBTB7zPLajTkIG2m98OKiUhELTKXh8bllHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8bhlHAU2jdXvz3coBC15yvDilUwOD1u06OimUhEMS6Lg8Q==');
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function initGame() {
+            const termsColumn = document.getElementById('termsColumn');
+            const definitionsColumn = document.getElementById('definitionsColumn');
+            
+            const shuffledTerms = shuffle([...pairs]);
+            const shuffledDefs = shuffle([...pairs]);
+            
+            termsColumn.innerHTML = '';
+            definitionsColumn.innerHTML = '';
+            
+            shuffledTerms.forEach((pair, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.textContent = pair.term;
+                card.dataset.id = pairs.indexOf(pair);
+                card.onclick = () => selectTerm(card);
+                termsColumn.appendChild(card);
+            });
+            
+            shuffledDefs.forEach((pair, index) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.textContent = pair.definition;
+                card.dataset.id = pairs.indexOf(pair);
+                card.onclick = () => selectDefinition(card);
+                definitionsColumn.appendChild(card);
+            });
+        }
+
+        function selectTerm(card) {
+            if (card.classList.contains('matched')) return;
+            
+            if (selectedTerm) {
+                selectedTerm.classList.remove('selected');
+            }
+            
+            selectedTerm = card;
+            card.classList.add('selected');
+            
+            checkMatch();
+        }
+
+        function selectDefinition(card) {
+            if (card.classList.contains('matched')) return;
+            
+            if (selectedDef) {
+                selectedDef.classList.remove('selected');
+            }
+            
+            selectedDef = card;
+            card.classList.add('selected');
+            
+            checkMatch();
+        }
+
+        function checkMatch() {
+            if (selectedTerm && selectedDef) {
+                if (selectedTerm.dataset.id === selectedDef.dataset.id) {
+                    selectedTerm.classList.add('matched');
+                    selectedDef.classList.add('matched');
+                    
+                    playSuccessSound();
+                    
+                    matchedPairs++;
+                    document.getElementById('scoreCount').textContent = matchedPairs;
+                    
+                    selectedTerm = null;
+                    selectedDef = null;
+                    
+                    if (matchedPairs === pairs.length) {
+                        setTimeout(showSuccess, 500);
+                    }
+                } else {
+                    setTimeout(() => {
+                        selectedTerm.classList.remove('selected');
+                        selectedDef.classList.remove('selected');
+                        selectedTerm = null;
+                        selectedDef = null;
+                    }, 1000);
+                }
+            }
+        }
+
+        function playSuccessSound() {
+            try {
+                successSound.currentTime = 0;
+                successSound.play();
+            } catch (e) {
+                console.log('Sound play failed');
+            }
+        }
+
+        function showSuccess() {
+            document.getElementById('overlay').classList.add('show');
+            document.getElementById('successMessage').classList.add('show');
+        }
+
+        function resetGame() {
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('successMessage').classList.remove('show');
+            matchedPairs = 0;
+            document.getElementById('scoreCount').textContent = '0';
+            selectedTerm = null;
+            selectedDef = null;
+            initGame();
+        }
+
+        initGame();
+    </script>
+</body>
+</html>
